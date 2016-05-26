@@ -1,0 +1,232 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>Demo</title>
+</head>
+<body>
+
+	<button id="myb1" onclick="nihao()">click</button>
+	<script
+		src="http://lib.sinaapp.com/js/jquery/1.9.1/jquery-1.9.1.min.js"></script>
+	<script>
+		var mycanvas = document.createElement("canvas");
+		mycanvas.width = window.innerWidth;
+		mycanvas.height = window.innerHeight;
+		document.body.appendChild(mycanvas);
+		var ctx = mycanvas.getContext("2d");
+		var qius;
+		var mis;
+		var selfqiu;
+		var initR = 20;
+		var initSpeed = 3;
+		var id;
+		var data;
+		var oj;//result from server
+
+		var colors = {
+			properties : [ "red", "yellow", "blue", "green" ],
+
+			get : function() {
+				var len = this.properties.length;
+				var choose = Math.floor(Math.random() * len);
+				return this.properties[choose];
+			}
+		};
+
+		var game = {
+
+			paint : function() {
+				qingli(mycanvas.width, mycanvas.height);
+				var strqius = httpGet("http://172.17.17.125:8080/a3-0.0.1-SNAPSHOT/wmp/paopao/loadQius");
+				var strmis = httpGet("http://172.17.17.125:8080/a3-0.0.1-SNAPSHOT/wmp/paopao/loadMis");
+
+				qius = JSON.parse(strqius);
+				mis = JSON.parse(strmis);
+
+				console.log("qius[0].x="+qius[0].x);
+				for ( var t in qius) {
+					drawqiu(qius[t]);
+				}
+				for ( var m in mis) {
+					drawqiu(mis[m]);
+				}
+			},
+
+			produceMi : function() {
+				var strmis = httpGet("http://172.17.17.125:8080/a3-0.0.1-SNAPSHOT/wmp/paopao/produceMis");
+				mis = JSON.parse(strmis);
+			},
+
+			move : function(e) {
+				var ox = selfqiu.x;
+				var oy = selfqiu.y;
+				var lx = Math.abs(e.pageX - ox);
+				var ly = Math.abs(e.pageY - oy);
+				
+				console.log("e.pageX = "+e.pageX );
+				
+				var movex = ((e.pageX > ox) ? (selfqiu.speed * lx / (lx + ly))
+						: ((-selfqiu.speed) * lx / (lx + ly)));
+				var movey = ((e.pageY > oy) ? (selfqiu.speed * ly / (lx + ly))
+						: ((-selfqiu.speed) * ly / (lx + ly)));
+				selfqiu.set(ox + movex, oy + movey, selfqiu.r);
+				
+				
+				data = {
+					"id" : id,
+					"qiu" : selfqiu
+				};
+				var sss = JSON.stringify(data);
+				console.log("sss = "+  sss );
+				var stroj = httpPOST(
+						"http://172.17.17.125:8080/a3-0.0.1-SNAPSHOT/wmp/paopao/updateQiu",
+						sss);
+				
+				console.log("stroj  = "+  stroj  );
+				oj = JSON.parse(stroj);
+				selfqiu.set(oj.x, oj.y, oj.r);
+			},
+
+			login : function() {
+
+				id = prompt("please enter your name");
+				var x = Math.random() * window.innerWidth;
+				var y = Math.random() * window.innerHeight;
+				var r = initR;
+				selfqiu = new qiu(x, y, r, colors.get(), initSpeed);
+
+				data = {
+					"id" : id,
+					"qiu" : selfqiu
+				};
+				var sss = JSON.stringify(data);
+				var stroj = httpPOST(
+						"http://172.17.17.125:8080/a3-0.0.1-SNAPSHOT/wmp/paopao/zhuceQiu",
+						sss);
+
+				if (oj == "0") {
+					game.login();
+				}
+
+				oj = JSON.parse(stroj);
+				selfqiu.set(oj.x, oj.y, oj.r);
+
+				document.addEventListener("mousemove", function(e) {
+					game.move(e);
+					game.paint();
+				}, false);
+			}
+		};
+
+		
+		$(document).ready(function() {
+			
+			game.login();
+
+//			setInterval(function() {
+//				game.paint();
+//			}, 1000);
+
+			setInterval(function() {
+				game.produceMi();
+			}, 5000);
+			
+		});
+		
+		function nihao() {
+
+			var jsonobj = {
+				x : 50,
+				y : 50,
+				r : 20,
+				yanse : "yellow",
+				speed : 3
+			};
+			alert(jsonobj.yanse);
+			var res;
+			var sss = JSON.stringify(jsonobj);
+			alert(sss);
+			res = httpPOST(
+					"http://172.17.17.125:8080/a3-0.0.1-SNAPSHOT/wmp/paopao/tt",
+					sss);
+
+			alert("res = " + res);
+			var kkk = JSON.parse(res);
+			drawqiu(kkk);
+
+		}
+
+		function qingli(x, y) {
+			ctx.clearRect(0, 0, x, y);
+		}
+		
+		function drawqiu(xiaomi) {
+
+			drawYuanQuan(xiaomi.x, xiaomi.y, xiaomi.r, xiaomi.yanse);
+		}
+
+		function drawYuanQuan(x, y, r, color) {
+			ctx.beginPath();
+			ctx.fillStyle = color;
+			ctx.arc(x, y, r, 0, 360, false);
+			ctx.fill();
+		}
+
+		function httpGet(theUrl) {
+			var xmlHttp = new XMLHttpRequest();
+			xmlHttp.open("GET", theUrl, false); // false for synchronous request
+			xmlHttp.send();
+			return xmlHttp.responseText;
+		}
+
+		function httpPOST(theUrl, data) {
+			var xmlHttp = new XMLHttpRequest();
+			xmlHttp.open("POST", theUrl, false); // false for synchronous request
+			xmlHttp.setRequestHeader("Content-Type", "application/json");
+			xmlHttp.send(data);
+			return xmlHttp.responseText;
+		}
+
+		function httpGetAsync(theUrl, callback) {
+			var xmlHttp = new XMLHttpRequest();
+			xmlHttp.onreadystatechange = function() {
+				if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
+					callback(xmlHttp.responseText);
+			}
+			xmlHttp.open("GET", theUrl, true); // true for asynchronous 
+			xmlHttp.send(null);
+		}
+
+		function httpPOSTAsync(theUrl, callback, data) {
+			var xmlHttp = new XMLHttpRequest();
+			xmlHttp.onreadystatechange = function() {
+				if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
+					callback(xmlHttp.responseText);
+			}
+			xmlHttp.open("POST", theUrl, true); // true for asynchronous 
+			xmlHttp.setRequestHeader("Content-Type", "application/json");
+			xmlHttp.send(data);
+		}
+
+		function qiu(x, y, r, yanse, speed) {
+			this.x = x;
+			this.y = y;
+			this.r = r;
+			this.yanse = yanse;
+			this.speed = speed;
+		}
+
+		qiu.prototype.set = function(x, y, r) {
+			this.x = x;
+			this.y = y;
+			this.r = r;
+			this.speed = initSpeed * initR / r;
+		};
+
+		qiu.prototype.resize = function(r) {
+			this.r = r;
+			this.speed = initspeed * initR / r;
+		};
+	</script>
+</body>
+</html>
